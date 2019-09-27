@@ -1,48 +1,35 @@
-"use strict";
+'use strict';
 
-const fs = require("fs");
-const { Parser } = require("json2csv");
+const fs = require('fs');
+const { Parser } = require('json2csv');
 
-const args = process.argv.slice(2);
+const data = fs.readFileSync(0, 'utf-8').toString();
 
-if (args.length == 0) {
-  console.error("Provide filepath to SonarQube json result file");
-  process.exit(1);
+const results = JSON.parse(data);
+
+if (!results.issues) {
+  throw 'No issues were found in the json file.';
 }
 
-const filePath = args[0];
+const severityRank = ['INFO', 'MINOR', 'MAJOR', 'CRITICAL', 'BLOCKER'];
+const issues = results.issues.sort((a, b) => {
+  const severityA = severityRank.indexOf(a.severity);
+  const severityB = severityRank.indexOf(b.severity);
 
-fs.readFile(filePath, (err, data) => {
-  if (err) {
-    throw err;
+  if (severityB === severityA) {
+    return a.rule.toLowerCase() > b.rule.toLowerCase() ? 1 : -1;
+  } else {
+    return severityB > severityA ? 1 : -1;
   }
-
-  const results = JSON.parse(data);
-
-  if (!results.issues) {
-    throw "No issues were found in the json file.";
-  }
-
-  const severityRank = ["INFO", "MINOR", "MAJOR", "CRITICAL", "BLOCKER"];
-  const issues = results.issues.sort((a, b) => {
-    const severityA = severityRank.indexOf(a.severity);
-    const severityB = severityRank.indexOf(b.severity);
-
-    if (severityB === severityA) {
-      return a.rule.toLowerCase() > b.rule.toLowerCase() ? 1 : -1;
-    } else {
-      return severityB > severityA ? 1 : -1;
-    }
-  });
-  const groupedIssues = groupIssuesByRule(issues);
-  const resultset = generateResultset(groupedIssues);
-
-  const fields = ["rule", "exampleMessage", "component", "severity"];
-  const json2csvParser = new Parser({ fields });
-  const csv = json2csvParser.parse(resultset);
-  process.stdout.write(csv);
-  process.exit();
 });
+const groupedIssues = groupIssuesByRule(issues);
+const resultset = generateResultset(groupedIssues);
+
+const fields = ['rule', 'exampleMessage', 'component', 'severity'];
+const json2csvParser = new Parser({ fields });
+const csv = json2csvParser.parse(resultset);
+process.stdout.write(csv);
+process.exit();
 
 function groupIssuesByRule(issues) {
   return issues.reduce((r, a) => {
@@ -76,10 +63,10 @@ function findComponentOccurrences(issues) {
   });
 
   const lines = Object.keys(occurrences).map(occurrence => {
-    const lineNumbers = occurrences[occurrence].join(", ");
-    const filename = occurrence.split(":")[1];
+    const lineNumbers = occurrences[occurrence].join(', ');
+    const filename = occurrence.split(':')[1];
     return `* ${filename} : [${lineNumbers}]`;
   });
 
-  return lines.join("\n");
+  return lines.join('\n');
 }
